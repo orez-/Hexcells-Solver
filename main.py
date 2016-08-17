@@ -1,123 +1,14 @@
-import collections
-import functools
-import itertools
-import sys
-import time
-
 from PIL import Image
 
-
-def timeit(msg):
-    def decorator(fn):
-        @functools.wraps(fn)
-        def anon(*args, **kwargs):
-            print(msg, end='')
-            sys.stdout.flush()
-            t = time.time()
-            result = fn(*args, **kwargs)
-            print(' - {:.1f}s'.format(time.time() - t))
-            return result
-        return anon
-    return decorator
+import hex_model
+import image_parse
+import util
 
 
-def bfs(im, x, y, predicate):
-    width, height = im.size
-    result = {(x, y)}
-    seen = {(x, y)}
-    q = collections.deque(result)
-    while q:
-        tx, ty = q.popleft()
-        for nx, ny in [(tx, ty - 1), (tx, ty + 1), (tx - 1, ty), (tx + 1, ty)]:
-            # if not in bounds, or already seen
-            if not (0 <= nx < width and 0 <= ny < height) or (nx, ny) in seen:
-                continue
-            seen.add((nx, ny))
-            if predicate(nx, ny):
-                result.add((nx, ny))
-                q.append((nx, ny))
-    return result
-
-
-@timeit("Beginning fuzzy select")
-def fuzzy_select(im, x, y, threshold=15):
-    threshold *= 3  # ᖍ(ツ)ᖌ
-    rgb = im.getpixel((x, y))
-
-    def predicate(x, y):
-        neighbor_rgb = im.getpixel((x, y))
-        return sum(abs(a - b) for a, b in zip(rgb, neighbor_rgb)) <= threshold
-
-    return bfs(im, x, y, predicate)
-
-
-@timeit("Inverting selection")
-def invert_selection(im, selection):
-    width, height = im.size
-    return set((x, y) for x in range(width) for y in range(height) if (x, y) not in selection)
-
-
-@timeit("Getting contiguous sections")
-def get_contiguous_sections(im, selection):
-    selection = set(selection)
-
-    def predicate(x, y):
-        return (x, y) in selection
-
-    while selection:
-        x, y = selection.pop()
-        result = bfs(im, x, y, predicate)
-        yield result
-        selection -= result
-
-
-def coordinate_by_key(key):
-    return coordinate(**key) if isinstance(key, dict) else coordinate(*key)
-
-
-def coordinate(x=None, y=None, z=None):
-    coords = x, y, z
-    nones = sum(c is None for c in coords)
-    if nones > 1:
-        raise TypeError("At least two coordinate values must be provided.")
-    if nones == 1:
-        final_coord = -sum(c for c in coords if c is not None)
-        coords = tuple(c if c is not None else final_coord for c in coords)
-    elif sum(coords):
-        raise ValueError("Coordinate values must sum to 0.")
-    return coords
-
-
-class HexBoard:
-    def __init__(self):
-        self._board = {}
-
-    def __setitem__(self, key, value):
-        coord = coordinate_by_key(key)
-        self._board[coord] = value
-
-    @property
-    def rows(self):
-        def sort_key(x_y_z__value):
-            (x, y, z), value = x_y_z__value
-            return y - z, x
-
-        def group_key(x_y_z__value):
-            (x, y, z), value = x_y_z__value
-            return y - z
-
-        data = sorted(self._board.items(), key=sort_key)
-        return itertools.groupby(data, group_key)
-
-    @property
-    def leftmost(self):
-        return min(x for x, y, z in self._board)
-
-
-@timeit("Parsin' hexagons")
+@util.timeit("Parsin' hexagons")
 def parse_hexagons(sections):
     origin = None
-    board = HexBoard()
+    board = hex_model.HexBoard()
     for section in sections:
         # TODO: better heuristics for identifying hexagons
         if 4000 < len(section) < 5000:
@@ -165,9 +56,9 @@ def display_board(board):
 
 if __name__ == '__main__':
     im = Image.open('scrsh.png')
-    selection = fuzzy_select(im, 0, 0, threshold=70)
-    selection = invert_selection(im, selection)
-    sections = get_contiguous_sections(im, selection)
+    selection = image_parse.fuzzy_select(im, 0, 0, threshold=70)
+    selection = image_parse.invert_selection(im, selection)
+    sections = image_parse.get_contiguous_sections(im, selection)
 
     board = parse_hexagons(sections)
 
