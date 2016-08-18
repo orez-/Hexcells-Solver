@@ -65,7 +65,8 @@ def get_text_from_image(im):
     for options + explanations.
     """
     im = im.convert('L')  # convert to grayscale for better readability
-    return pytesseract.image_to_string(im, config='-psm 8')
+    config = '-psm 8 -c tessedit_char_whitelist=0123456789-?{}'
+    return pytesseract.image_to_string(im, config=config)
 
 
 def get_coords_bounding_box(coords):
