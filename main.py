@@ -45,6 +45,26 @@ def _interpret_text(text):
     raise ValueError("Could not parse {!r}".format(text))
 
 
+def get_hex_text(im, box):
+    """
+    Read text from the hex contained in the given box.
+    """
+    # we chop off the corners of the hex to avoid getting the OCR confused about
+    # the shape of the hex vs numbers.
+    fourth_width = (box.right - box.left) // 4
+    fourth_height = (box.bottom - box.top) // 4
+    hex_img = im.crop((
+        box.left + fourth_width, box.top + fourth_height,
+        box.right - fourth_width, box.bottom - fourth_height,
+    ))
+    try:
+        return _interpret_text(image_parse.get_text_from_image(hex_img))
+    except ValueError as e:
+        # If can't determine the value, mechanical turk it for now.
+        hex_img.show()
+        return input("\n{}: ".format(e))
+
+
 @util.timeit("Parsin' hexagons")
 def parse_hexagons(im, sections):
     origin = None
@@ -55,12 +75,12 @@ def parse_hexagons(im, sections):
         if not (4000 < length < 5000):
             continue
         center = tuple(sum(coord_set) // length for coord_set in zip(*section))
-        left, top, right, bottom = image_parse.get_coords_bounding_box(section)
+        box = image_parse.get_coords_bounding_box(section)
 
         if not origin:
             # Arbitrarily call this guy the origin
             spacing = 1.2  # TODO: >:\
-            unit = (center[0] - left) * spacing
+            unit = (center[0] - box.left) * spacing
             origin = center
             coord = (0, 0)
         else:
@@ -82,21 +102,7 @@ def parse_hexagons(im, sections):
 
         epsilon = 20  # TODO: ᖍ(ツ)ᖌ
         if len(white_pixels) > epsilon:  # enough white pixels to check for a number
-            # we chop off the corners of the hex to avoid getting the OCR confused about
-            # the shape of the hex vs numbers.
-            fourth_width = (right - left) // 4
-            fourth_height = (bottom - top) // 4
-            hex_img = im.crop((
-                left + fourth_width, top + fourth_height,
-                right - fourth_width, bottom - fourth_height,
-            ))
-            try:
-                text = _interpret_text(image_parse.get_text_from_image(hex_img))
-            except ValueError as e:
-                # If can't determine the value, mechanical turk it for now.
-                hex_img.show()
-                text = input("\n{}: ".format(e))
-
+            text = get_hex_text(im, box)
         board[coord] = hex_model.Hex(text, color)
     return board
 

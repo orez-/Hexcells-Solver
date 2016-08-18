@@ -4,6 +4,8 @@ import pytesseract
 
 import util
 
+Box = collections.namedtuple('Box', 'left top right bottom')
+
 
 def _bfs(im, x, y, predicate):
     width, height = im.size
@@ -73,4 +75,4 @@ def get_coords_bounding_box(coords):
     Returns (left, top, right, bottom)
     """
     xs, ys = zip(*coords)
-    return min(xs), min(ys), max(xs), max(ys)
+    return Box(min(xs), min(ys), max(xs), max(ys))
