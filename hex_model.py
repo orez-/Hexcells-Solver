@@ -31,14 +31,43 @@ def coordinate_by_key(key):
     return coordinate(**key) if isinstance(key, dict) else coordinate(*key)
 
 
+def parse_clue(text):
+    """
+    Parse the text of a clue.
+
+    Returns (integer value, contiguous)
+    If the clue indicates the values must be contiguous, `contiguous` is True.
+    If the clue indicates the values must NOT be contiguous, `contiguous` is False.
+    If the clue does not indicate whether the values must be contiguous or not,
+        `contiguous` is None.
+    """
+    if text == '-':
+        return None, None
+    if text.startswith('-'):
+        return int(text[1:-1]), False
+    if text.startswith('{'):
+        return int(text[1:-1]), True
+    try:
+        return int(text), None
+    except ValueError:
+        return None, None
+
+
 class Hex:
-    def __init__(self, value, color):
-        self.value = value
+    def __init__(self, text, color):
+        self.value, self.contiguous = parse_clue(text)
         self.color = color
 
     @property
     def text(self):
-        return self.value
+        if self.value is None:
+            return '-'
+        fmt = {
+            None: '{}',
+            True: '{{{}}}',
+            False: '-{}-',
+        }[self.contiguous]
+        return fmt.format(self.value)
 
 
 class HexBoard:

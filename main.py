@@ -1,4 +1,6 @@
-from PIL import Image
+import re
+
+import PIL.Image
 
 import hex_model
 import image_parse
@@ -14,6 +16,33 @@ hexagon_colors = {
     hex_model.Color.yellow: 214,
     hex_model.Color.black: 237,
 }
+
+
+def _interpret_text(text):
+    """
+    Interpret OCR'd text as something we expect.
+
+    All values will be of one of the following forms:
+    -\d+-
+    \{\d+\}
+    \d+
+    \?
+
+    Unfortunately, our OCR results are a little fuzzy sometimes, so we
+    pass it through this function to make a best guess as to what we're
+    looking at.
+    """
+    patterns = [
+        (r'^[-._]+(\d+)[-._]+$', '-{}-'),
+        (r'^[\[({]+(\d+)[\])}]+$', '{{{}}}'),
+        (r'^(\d+)$', '{}'),
+        (r'^(\?)$', '{}'),
+    ]
+    for pattern, replacement in patterns:
+        match = re.match(pattern, text)
+        if match:
+            return replacement.format(match.group(1))
+    raise ValueError("Could not parse {!r}".format(text))
 
 
 @util.timeit("Parsin' hexagons")
@@ -56,8 +85,17 @@ def parse_hexagons(im, sections):
             # we chop off the corners of the hex to avoid getting the OCR confused about
             # the shape of the hex vs numbers.
             fourth_width = (right - left) // 4
-            hex_img = im.crop((left + fourth_width, top, right - fourth_width, bottom))
-            text = image_parse.get_text_from_image(hex_img) or '#'
+            fourth_height = (bottom - top) // 4
+            hex_img = im.crop((
+                left + fourth_width, top + fourth_height,
+                right - fourth_width, bottom - fourth_height,
+            ))
+            try:
+                text = _interpret_text(image_parse.get_text_from_image(hex_img))
+            except ValueError as e:
+                # If can't determine the value, mechanical turk it for now.
+                hex_img.show()
+                text = input("\n{}: ".format(e))
 
         board[coord] = hex_model.Hex(text, color)
     return board
@@ -96,7 +134,7 @@ def display_board(board):
 if __name__ == '__main__':
     full = True
     if full:
-        im = Image.open('scrsh.png').convert('RGB')
+        im = PIL.Image.open('scrsh.png').convert('RGB')
         selection = image_parse.fuzzy_select(im, 0, 0, threshold=70)
         selection = image_parse.invert_selection(im, selection)
         sections = image_parse.get_contiguous_sections(im, selection)

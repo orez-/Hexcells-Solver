@@ -58,8 +58,12 @@ def get_contiguous_sections(im, selection):
 def get_text_from_image(im):
     """
     Given an image, return the text from it.
+
+    See https://github.com/tesseract-ocr/tesseract/wiki/Command-Line-Usage
+    for options + explanations.
     """
-    return pytesseract.image_to_string(im)
+    im = im.convert('L')  # convert to grayscale for better readability
+    return pytesseract.image_to_string(im, config='-psm 8')
 
 
 def get_coords_bounding_box(coords):
