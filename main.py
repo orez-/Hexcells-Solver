@@ -4,24 +4,62 @@ import hex_model
 import image_parse
 import util
 
+af = '\x1b[38;5;{}m'.format
+ab = '\x1b[48;5;{}m'.format
+clear = '\x1b[0m'
+
+
+hexagon_colors = {
+    hex_model.Color.blue: 38,
+    hex_model.Color.yellow: 214,
+    hex_model.Color.black: 237,
+}
+
 
 @util.timeit("Parsin' hexagons")
-def parse_hexagons(sections):
+def parse_hexagons(im, sections):
     origin = None
     board = hex_model.HexBoard()
     for section in sections:
         # TODO: better heuristics for identifying hexagons
-        if 4000 < len(section) < 5000:
-            center = tuple(sum(coord_set) // len(section) for coord_set in zip(*section))
-            if not origin:
-                leftmost = min(next(zip(*section)))
-                spacing = 1.2  # TODO: >:\
-                unit = (center[0] - leftmost) * spacing
-                origin = center
-                coord = (0, 0)
-            else:
-                coord = pixel_to_hex(center[0] - origin[0], center[1] - origin[1], unit)
-            board[coord] = 1
+        length = len(section)
+        if not (4000 < length < 5000):
+            continue
+        center = tuple(sum(coord_set) // length for coord_set in zip(*section))
+        left, top, right, bottom = image_parse.get_coords_bounding_box(section)
+
+        if not origin:
+            # Arbitrarily call this guy the origin
+            spacing = 1.2  # TODO: >:\
+            unit = (center[0] - left) * spacing
+            origin = center
+            coord = (0, 0)
+        else:
+            coord = pixel_to_hex(center[0] - origin[0], center[1] - origin[1], unit)
+
+        # Get pixels that are not white (white is numbers)
+        white_pixels, pixels = util.partition_if(
+            (im.getpixel((x, y)) for x, y in section),
+            lambda value: all(c > 200 for c in value)
+        )
+
+        # If speed is an issue here we can probably take many fewer pixels.
+        color = tuple(
+            sum(component) / length
+            for component in zip(*pixels)
+        )
+        color = hex_model.Color.closest(color)
+        text = '-'
+
+        epsilon = 20  # TODO: ᖍ(ツ)ᖌ
+        if len(white_pixels) > epsilon:  # enough white pixels to check for a number
+            # we chop off the corners of the hex to avoid getting the OCR confused about
+            # the shape of the hex vs numbers.
+            fourth_width = (right - left) // 4
+            hex_img = im.crop((left + fourth_width, top, right - fourth_width, bottom))
+            text = image_parse.get_text_from_image(hex_img) or '#'
+
+        board[coord] = hex_model.Hex(text, color)
     return board
 
 
@@ -44,25 +82,27 @@ def display_board(board):
             # leftmost is odd, align odd x's on left
             print(end='  ')
         else:
-            # row_id is odd, leftmost is odd, diff one more than you are
-            # row_id is even, leftmost is even, diff one more than you are
+            # row_num is odd, leftmost is odd, diff one more than you are
+            # row_num is even, leftmost is even, diff one more than you are
             last -= 1
-        for (x, y, z), value in row:
+        for (x, y, z), hex_ in row:
+            color = hexagon_colors[hex_.color]
             print(end='    ' * ((x - last + 1) // 2 - 1))
-            print(value, end='   ')
+            print('{}{:^3}{}'.format(af(color), hex_.text, clear), end=' ')  # af or ab are nice here.
             last = x
         print()
 
 
 if __name__ == '__main__':
-    im = Image.open('scrsh.png')
-    selection = image_parse.fuzzy_select(im, 0, 0, threshold=70)
-    selection = image_parse.invert_selection(im, selection)
-    sections = image_parse.get_contiguous_sections(im, selection)
+    full = True
+    if full:
+        im = Image.open('scrsh.png').convert('RGB')
+        selection = image_parse.fuzzy_select(im, 0, 0, threshold=70)
+        selection = image_parse.invert_selection(im, selection)
+        sections = image_parse.get_contiguous_sections(im, selection)
 
-    board = parse_hexagons(sections)
-
-    # board = HexBoard()
-    # board._board = {(-4, 6, -2): 1, (-7, 2, 5): 1, (12, 2, -14): 1, (7, -4, -3): 1, (11, -4, -7): 1, (4, -2, -2): 1, (-3, -2, 5): 1, (-2, 8, -6): 1, (12, -7, -5): 1, (-7, 3, 4): 1, (7, 2, -9): 1, (12, -2, -10): 1, (9, 2, -11): 1, (6, 6, -12): 1, (4, 2, -6): 1, (11, -8, -3): 1, (11, 3, -14): 1, (-5, -1, 6): 1, (-7, 5, 2): 1, (13, -4, -9): 1, (6, 1, -7): 1, (12, -5, -7): 1, (0, -4, 4): 1, (-3, 5, -2): 1, (5, 6, -11): 1, (4, -5, 1): 1, (5, -1, -4): 1, (3, 3, -6): 1, (0, 6, -6): 1, (-5, 9, -4): 1, (11, -5, -6): 1, (3, -3, 0): 1, (0, 9, -9): 1, (6, 3, -9): 1, (9, 3, -12): 1, (-3, 3, 0): 1, (10, -6, -4): 1, (9, 4, -13): 1, (-6, 0, 6): 1, (-2, 1, 1): 1, (5, 1, -6): 1, (1, -1, 0): 1, (3, -4, 1): 1, (4, 5, -9): 1, (1, 8, -9): 1, (-4, 4, 0): 1, (8, -6, -2): 1, (13, -5, -8): 1, (-5, 2, 3): 1, (-5, 5, 0): 1, (6, -3, -3): 1, (11, 2, -13): 1, (2, 3, -5): 1, (-7, 6, 1): 1, (-4, 0, 4): 1, (-5, 8, -3): 1, (8, -1, -7): 1, (9, 1, -10): 1, (8, -8, 0): 1, (-4, -1, 5): 1, (10, 1, -11): 1, (2, -1, -1): 1, (4, -3, -1): 1, (13, 0, -13): 1, (3, 2, -5): 1, (-4, 11, -7): 1, (4, -6, 2): 1, (13, -1, -12): 1, (-7, 7, 0): 1, (-6, 2, 4): 1, (1, -4, 3): 1, (-7, 9, -2): 1, (8, -4, -4): 1, (6, -4, -2): 1, (8, -7, -1): 1, (-3, 2, 1): 1, (1, -2, 1): 1, (-4, 3, 1): 1, (0, 7, -7): 1, (4, -4, 0): 1, (2, 0, -2): 1, (-3, 0, 3): 1, (4, 4, -8): 1, (0, -1, 1): 1, (-6, 11, -5): 1, (7, 1, -8): 1, (-2, -1, 3): 1, (7, 3, -10): 1, (12, -9, -3): 1, (-5, 11, -6): 1, (5, 0, -5): 1, (-1, 8, -7): 1, (6, -2, -4): 1, (9, 0, -9): 1, (10, -5, -5): 1, (-6, 8, -2): 1, (-5, 7, -2): 1, (0, -2, 2): 1, (1, 0, -1): 1, (4, -1, -3): 1, (3, -1, -2): 1, (0, 0, 0): 1, (9, -2, -7): 1, (-6, 5, 1): 1, (0, 3, -3): 1, (-3, 9, -6): 1, (-7, 10, -3): 1, (-2, 7, -5): 1, (10, -8, -2): 1, (-4, 1, 3): 1, (10, 2, -12): 1, (-3, -1, 4): 1, (-2, 5, -3): 1, (11, -1, -10): 1, (8, -5, -3): 1, (8, 1, -9): 1, (-3, 1, 2): 1, (10, -2, -8): 1, (1, 1, -2): 1, (2, 1, -3): 1, (7, -6, -1): 1, (1, 3, -4): 1, (2, 7, -9): 1, (5, -6, 1): 1, (11, -3, -8): 1, (0, -3, 3): 1, (7, 0, -7): 1, (-6, 9, -3): 1, (12, 0, -12): 1, (-3, 10, -7): 1, (0, 2, -2): 1, (5, -2, -3): 1, (7, 5, -12): 1, (-1, 3, -2): 1, (-2, 9, -7): 1, (5, -5, 0): 1, (-1, 1, 0): 1, (7, -7, 0): 1, (9, -3, -6): 1, (-1, 7, -6): 1, (10, -7, -3): 1, (4, 0, -4): 1, (-5, 4, 1): 1, (8, 5, -13): 1, (10, -9, -1): 1, (13, -2, -11): 1, (-6, 1, 5): 1, (9, -5, -4): 1, (0, 1, -1): 1, (3, 4, -7): 1, (0, 5, -5): 1, (-4, -2, 6): 1, (6, 4, -10): 1, (-6, 10, -4): 1, (3, 7, -10): 1, (1, 6, -7): 1, (-1, 4, -3): 1, (13, -7, -6): 1, (0, 4, -4): 1, (2, 5, -7): 1, (7, -1, -6): 1, (12, 1, -13): 1, (8, -2, -6): 1, (7, 4, -11): 1, (10, -1, -9): 1, (-4, 7, -3): 1, (-2, 2, 0): 1, (5, 3, -8): 1, (1, 4, -5): 1, (-2, 6, -4): 1, (2, 2, -4): 1, (12, -3, -9): 1, (7, -3, -4): 1, (2, 8, -10): 1, (-1, -3, 4): 1, (6, -7, 1): 1, (4, 1, -5): 1, (3, -5, 2): 1, (1, 5, -6): 1, (-3, 6, -3): 1, (6, 0, -6): 1, (12, -6, -6): 1, (11, 0, -11): 1, (2, -4, 2): 1, (7, -5, -2): 1, (-1, -1, 2): 1, (-4, 8, -4): 1, (-2, 3, -1): 1, (10, -3, -7): 1, (3, 6, -9): 1, (13, -8, -5): 1, (6, 5, -11): 1, (-6, 3, 3): 1, (11, -7, -4): 1, (5, 5, -10): 1, (-6, 6, 0): 1, (-4, 10, -6): 1, (5, 2, -7): 1, (11, -9, -2): 1}
+        board = parse_hexagons(im, sections)
+    else:
+        board = hex_model.get_debug_board()
     display_board(board)
     print()

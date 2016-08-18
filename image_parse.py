@@ -1,5 +1,7 @@
 import collections
 
+import pytesseract
+
 import util
 
 
@@ -28,7 +30,7 @@ def fuzzy_select(im, x, y, threshold=15):
 
     def predicate(x, y):
         neighbor_rgb = im.getpixel((x, y))
-        return sum(abs(a - b) for a, b in zip(rgb, neighbor_rgb)) <= threshold
+        return util.color_diff(rgb, neighbor_rgb) <= threshold
 
     return _bfs(im, x, y, predicate)
 
@@ -51,3 +53,20 @@ def get_contiguous_sections(im, selection):
         result = _bfs(im, x, y, predicate)
         yield result
         selection -= result
+
+
+def get_text_from_image(im):
+    """
+    Given an image, return the text from it.
+    """
+    return pytesseract.image_to_string(im)
+
+
+def get_coords_bounding_box(coords):
+    """
+    Given an unordered iterable of coordinates, get their bounding box.
+
+    Returns (left, top, right, bottom)
+    """
+    xs, ys = zip(*coords)
+    return min(xs), min(ys), max(xs), max(ys)
