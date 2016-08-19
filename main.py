@@ -11,6 +11,8 @@ ab = '\x1b[48;5;{}m'.format
 clear = '\x1b[0m'
 
 
+HEXAGON_RATIO = (3 ** 0.5) / 2  # width * HEXAGON_RATIO = height
+
 hexagon_colors = {
     hex_model.Color.blue: 38,
     hex_model.Color.yellow: 214,
@@ -51,8 +53,8 @@ def get_hex_text(im, box):
     """
     # we chop off the corners of the hex to avoid getting the OCR confused about
     # the shape of the hex vs numbers.
-    fourth_width = (box.right - box.left) // 4
-    fourth_height = (box.bottom - box.top) // 4
+    fourth_width = box.width // 4
+    fourth_height = box.height // 4
     hex_img = im.crop((
         box.left + fourth_width, box.top + fourth_height,
         box.right - fourth_width, box.bottom - fourth_height,
@@ -65,17 +67,34 @@ def get_hex_text(im, box):
         return input("\n{}: ".format(e))
 
 
+def is_hexagon(section, box):
+    """
+    Identify if the given contiguous set of coordinates is a hexagon.
+    """
+    # TODO: better heuristics for identifying hexagons
+
+    # Ensure the bounding-box is sized like a regular hexagon.
+    epsilon = 5
+    if abs(box.width * HEXAGON_RATIO - box.height) > epsilon:
+        return False
+
+    # Eliminate noise.
+    if len(section) < 1000:
+        return False
+
+    return True
+
+
 @util.timeit("Parsin' hexagons")
 def parse_hexagons(im, sections):
     origin = None
     board = hex_model.HexBoard()
     for section in sections:
-        # TODO: better heuristics for identifying hexagons
         length = len(section)
-        if not (4000 < length < 5000):
+        box = image_parse.get_coords_bounding_box(section)
+        if not is_hexagon(section, box):
             continue
         center = tuple(sum(coord_set) // length for coord_set in zip(*section))
-        box = image_parse.get_coords_bounding_box(section)
 
         if not origin:
             # Arbitrarily call this guy the origin

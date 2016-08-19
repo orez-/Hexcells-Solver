@@ -4,7 +4,15 @@ import pytesseract
 
 import util
 
-Box = collections.namedtuple('Box', 'left top right bottom')
+
+class Box(collections.namedtuple('Box', 'left top right bottom')):
+    @property
+    def width(self):
+        return self.right - self.left
+
+    @property
+    def height(self):
+        return self.bottom - self.top
 
 
 def _bfs(im, x, y, predicate):

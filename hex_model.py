@@ -96,6 +96,8 @@ class HexBoard:
 
     @property
     def leftmost(self):
+        if not self._board:
+            raise ValueError("empty board")
         return min(x for x, y, z in self._board)
 
 
