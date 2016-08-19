@@ -184,4 +184,9 @@ if __name__ == '__main__':
     else:
         board = get_debug_board()
     display_board(board)
+    solutions = list(board.solve())
+    for coord, color in solutions:
+        board[coord].color = color
+    print()
+    display_board(board)
     print()

@@ -73,6 +73,14 @@ def parse_clue(text):
         return None, None
 
 
+def generate_hex_circle(distance):
+    return (
+       (x, y, -x - y)
+       for x in range(-distance, distance + 1)
+       for y in range(max(-distance, -distance - x), min(distance, distance - x) + 1)
+    )
+
+
 class Hex:
     def __init__(self, text, color):
         self.value, self.contiguous = parse_clue(text)
@@ -96,6 +104,11 @@ class Hex:
 class HexBoard:
     def __init__(self):
         self._board = {}
+        self._regions = None
+
+    def __getitem__(self, key):
+        coord = coordinate_by_key(key)
+        return self._board[coord]
 
     def __setitem__(self, key, value):
         coord = coordinate_by_key(key)
@@ -138,3 +151,98 @@ class HexBoard:
             raise ValueError("empty board")
         return min(x for x, y, z in self._board)
 
+    def _neighbors(self, coord, distance=1):
+        return {
+            neighbor for neighbor in (
+                tuple(map(sum, zip(coord, delta)))
+                for delta in generate_hex_circle(distance)
+                if any(delta)  # don't yield yourself
+            ) if neighbor in self._board
+        }
+
+    def _get_simplified_region(self, hexes, value, projected=()):
+        filtered_hexes = set()
+        for coord in hexes:
+            if coord in projected:
+                color = projected[coord]
+            else:
+                color = self._board[coord].color
+            if color == Color.yellow:
+                filtered_hexes.add(coord)
+            elif color == Color.blue:
+                value -= 1
+            # do nothing with black.
+        assert value >= 0, value
+        assert value <= len(filtered_hexes), (value, len(filtered_hexes))
+        return frozenset(filtered_hexes), value
+
+    def _populate_regions(self):
+        """
+        Process information into generic regions with values.
+        """
+        self._regions = {}
+        for coord, hex_ in self._board.items():
+            if hex_.value is None:
+                continue
+            distance = 1 if hex_.color == Color.black else 2
+            hexes, value = self._get_simplified_region(self._neighbors(coord, distance), hex_.value)
+            self._regions[hexes] = value
+
+    def _identify_solved_regions(self, projected):
+        projected = {} if projected is True else dict(projected)
+        solutions = set()
+        new_regions = {}
+        for hexes, value in self._regions.items():
+            hexes, value = self._get_simplified_region(hexes, value, projected)
+            if len(hexes) == value:
+                solutions.update((hex_, Color.blue) for hex_ in hexes)
+            elif value == 0:
+                solutions.update((hex_, Color.black) for hex_ in hexes)
+            else:
+                new_regions[hexes] = value
+        return solutions, new_regions
+
+    def _subdivide_overlapping_regions(self):
+        # examine overlapping regions
+        new_regions = {}
+        # compare each region to each other
+        for (hexes1, value1), (hexes2, value2) in itertools.combinations(self._regions.items(), 2):
+            overlap = frozenset(hexes1 & hexes2)
+            if not overlap:
+                continue
+
+            hexes1_exclusive = frozenset(hexes1 - overlap)
+            hexes2_exclusive = frozenset(hexes2 - overlap)
+            # find the upper and lower bounds for each that can fit in the overlap.
+            omax = min(len(overlap), value2, value1)
+            omin = max(
+                value2 - len(hexes2_exclusive),
+                value1 - len(hexes1_exclusive),
+                0,
+            )
+            if omin == omax:
+                if overlap not in self._regions:
+                    new_regions[overlap] = omax
+                if hexes1_exclusive not in self._regions:
+                    new_regions[hexes1_exclusive] = value1 - omax
+                if hexes2_exclusive not in self._regions:
+                    new_regions[hexes2_exclusive] = value2 - omax
+        return new_regions
+
+    def solve(self):
+        """
+        Yield new information that can be inferred from the board state.
+        """
+        self._populate_regions()
+
+        progress = True
+        while progress:
+            # Identify newly-solved regions
+            solutions = True
+            while solutions:
+                solutions, self._regions = self._identify_solved_regions(solutions)
+                yield from solutions
+
+            new_regions = self._subdivide_overlapping_regions()
+            progress = bool(new_regions)
+            self._regions.update(new_regions)
