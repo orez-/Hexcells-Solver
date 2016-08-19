@@ -35,6 +35,11 @@ def _bfs(im, x, y, predicate):
 
 @util.timeit("Beginning fuzzy select")
 def fuzzy_select(im, x, y, threshold=15):
+    """
+    Select a contiguous region on the basis of color.
+
+    Returns a set of coordinates representing the selected region.
+    """
     threshold *= 3  # ᖍ(ツ)ᖌ
     rgb = im.getpixel((x, y))
 
@@ -53,6 +58,9 @@ def invert_selection(im, selection):
 
 @util.timeit("Getting contiguous sections")
 def get_contiguous_sections(im, selection):
+    """
+    Yield all contiguous regions of coordinates from a selection.
+    """
     selection = set(selection)
 
     def predicate(x, y):
@@ -80,8 +88,6 @@ def get_text_from_image(im):
 def get_coords_bounding_box(coords):
     """
     Given an unordered iterable of coordinates, get their bounding box.
-
-    Returns (left, top, right, bottom)
     """
     xs, ys = zip(*coords)
     return Box(min(xs), min(ys), max(xs), max(ys))
