@@ -156,6 +156,21 @@ def display_board(board):
         print()
 
 
+def save_debug_board(board):
+    try:
+        with open('debug_board.txt', 'w') as f:
+            f.write(repr(board._board))
+    except IOError as e:
+        print("Error saving file -", str(e))
+
+
+def get_debug_board():
+    board = hex_model.HexBoard()
+    with open('debug_board.txt', 'r') as f:
+        board._board = eval(f.read(), vars(hex_model))
+    return board
+
+
 if __name__ == '__main__':
     full = True
     if full:
@@ -165,7 +180,8 @@ if __name__ == '__main__':
         sections = image_parse.get_contiguous_sections(im, selection)
 
         board = parse_hexagons(im, sections)
+        save_debug_board(board)
     else:
-        board = hex_model.get_debug_board()
+        board = get_debug_board()
     display_board(board)
     print()
