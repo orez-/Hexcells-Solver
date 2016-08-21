@@ -33,3 +33,25 @@ def partition_if(iterable, predicate=lambda x: x):
         else:
             falsey.append(value)
     return truthy, falsey
+
+
+def split_iterable(iterable, predicate=bool):
+    """
+    Yield sublists of `iterable`, split on elements that satisfy `predicate`.
+
+    The elements that are split upon are discarded, and adjacent
+    elements that split are condensed; an empty sublist will never
+    be yielded.
+    """
+    section = []
+
+    for element in iterable:
+        if predicate(element):
+            if section:
+                yield section
+                section = []
+        else:
+            section.append(element)
+
+    if section:
+        yield section

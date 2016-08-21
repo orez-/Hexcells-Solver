@@ -185,8 +185,7 @@ if __name__ == '__main__':
         board = get_debug_board()
     display_board(board)
     solutions = list(board.solve())
-    for coord, color in solutions:
-        board[coord].color = color
+    board.apply_clicked()
     print()
     display_board(board)
     print()
