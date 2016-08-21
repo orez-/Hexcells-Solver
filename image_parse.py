@@ -14,6 +14,10 @@ class Box(collections.namedtuple('Box', 'left top right bottom')):
     def height(self):
         return self.bottom - self.top
 
+    @property
+    def center(self):
+        return self.left + self.width // 2, self.top + self.height // 2
+
 
 def _bfs(im, x, y, predicate):
     width, height = im.size
@@ -69,7 +73,7 @@ def get_contiguous_sections(im, selection):
     while selection:
         x, y = selection.pop()
         result = _bfs(im, x, y, predicate)
-        yield result
+        yield ImageSection(result)
         selection -= result
 
 
@@ -91,3 +95,9 @@ def get_coords_bounding_box(coords):
     """
     xs, ys = zip(*coords)
     return Box(min(xs), min(ys), max(xs), max(ys))
+
+
+class ImageSection(frozenset):
+    @util.cached_property
+    def bounding_box(self):
+        return get_coords_bounding_box(self)

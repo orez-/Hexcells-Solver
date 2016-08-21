@@ -82,9 +82,10 @@ def generate_hex_circle(distance):
 
 
 class Hex:
-    def __init__(self, text, color):
+    def __init__(self, text, color, image_section=None):
         self.value, self.is_contiguous = parse_clue(text)
         self.color = color
+        self.image_section = image_section
 
     @property
     def text(self):

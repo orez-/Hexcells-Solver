@@ -90,11 +90,10 @@ def parse_hexagons(im, sections):
     origin = None
     board = hex_model.HexBoard()
     for section in sections:
-        length = len(section)
-        box = image_parse.get_coords_bounding_box(section)
+        box = section.bounding_box
         if not is_hexagon(section, box):
             continue
-        center = tuple(sum(coord_set) // length for coord_set in zip(*section))
+        center = box.center
 
         if not origin:
             # Arbitrarily call this guy the origin
@@ -105,25 +104,34 @@ def parse_hexagons(im, sections):
         else:
             coord = pixel_to_hex(center[0] - origin[0], center[1] - origin[1], unit)
 
-        # Get pixels that are not white (white is numbers)
-        white_pixels, pixels = util.partition_if(
-            (im.getpixel((x, y)) for x, y in section),
-            lambda value: all(c > 200 for c in value)
-        )
-
-        # If speed is an issue here we can probably take many fewer pixels.
-        color = tuple(
-            sum(component) / length
-            for component in zip(*pixels)
-        )
-        color = hex_model.Color.closest(color)
-        text = '-'
-
-        epsilon = 20  # TODO: ᖍ(ツ)ᖌ
-        if len(white_pixels) > epsilon:  # enough white pixels to check for a number
-            text = get_hex_text(im, box)
-        board[coord] = hex_model.Hex(text, color)
+        board[coord] = read_hex(im, section)
     return board
+
+
+def read_hex(im, section):
+    # Get pixels that are not white (white is numbers)
+    white_pixels, pixels = util.partition_if(
+        (im.getpixel((x, y)) for x, y in section),
+        lambda value: all(c > 200 for c in value)
+    )
+
+    # If speed is an issue here we can probably take many fewer pixels.
+    color = tuple(
+        sum(component) / len(section)
+        for component in zip(*pixels)
+    )
+    color = hex_model.Color.closest(color)
+    text = '-'
+
+    epsilon = 20  # TODO: ᖍ(ツ)ᖌ
+    if len(white_pixels) > epsilon:  # enough white pixels to check for a number
+        text = get_hex_text(im, section.bounding_box)
+
+    return hex_model.Hex(
+        text=text,
+        color=color,
+        image_section=section,
+    )
 
 
 def pixel_to_hex(x, y, size):
