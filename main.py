@@ -1,3 +1,4 @@
+import argparse
 import re
 
 import PIL.Image
@@ -158,8 +159,11 @@ def display_board(board):
             last -= 1
         for (x, y, z), hex_ in row:
             color = hexagon_colors[hex_.color]
+            color = af(color)
+            if x == y == z == 0:
+                color += ab(237)
             print(end='    ' * ((x - last + 1) // 2 - 1))
-            print('{}{:^3}{}'.format(af(color), hex_.text, clear), end=' ')  # af or ab are nice here.
+            print('{}{:^3}{}'.format(color, hex_.text, clear), end=' ')
             last = x
         print()
 
@@ -179,21 +183,45 @@ def get_debug_board():
     return board
 
 
-if __name__ == '__main__':
-    full = True
-    if full:
-        im = PIL.Image.open('scrsh.png').convert('RGB')
-        selection = image_parse.fuzzy_select(im, 0, 0, threshold=70)
-        selection = image_parse.invert_selection(im, selection)
-        sections = image_parse.get_contiguous_sections(im, selection)
+def read_board(im):
+    im = im.convert('RGB')
+    selection = image_parse.fuzzy_select(im, 0, 0, threshold=70)
+    selection = image_parse.invert_selection(im, selection)
+    sections = image_parse.get_contiguous_sections(im, selection)
 
-        board = parse_hexagons(im, sections)
-        save_debug_board(board)
-    else:
-        board = get_debug_board()
+    board = parse_hexagons(im, sections)
+    save_debug_board(board)
+    return board
+
+
+def run_debug(args):
+    board = get_debug_board()
     display_board(board)
+    print('\n')
     solutions = list(board.solve())
     board.apply_clicked()
-    print()
     display_board(board)
-    print()
+
+
+def run_screenshot(args):
+    board = read_board(PIL.Image.open(args.file))
+    display_board(board)
+    print('\n')
+    solutions = list(board.solve())
+    board.apply_clicked()
+    display_board(board)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='')
+    subparsers = parser.add_subparsers()
+
+    debug_parser = subparsers.add_parser('debug', help="")
+    debug_parser.set_defaults(func=run_debug)
+
+    screenshot_parser = subparsers.add_parser('screenshot', help="")
+    screenshot_parser.add_argument('file', type=str, help="path to the screenshot")
+    screenshot_parser.set_defaults(func=run_screenshot)
+
+    args = parser.parse_args()
+    args.func(args)
