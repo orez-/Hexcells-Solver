@@ -288,7 +288,7 @@ class ContiguousConstraint(AbstractContiguousConstraint):
         # If we know some blues, we might know the contiguous section wont reach the edges.
         # 3: yybbyy -> kybbyk
         if blues:
-            max_left = blues[-1] - self.value + 1
+            max_left = max(0, blues[-1] - self.value + 1)
             min_right = blues[0] + self.value
             temp = list(
                 self._set_sections([section[:max_left], section[min_right:]], Color.black)
