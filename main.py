@@ -1,10 +1,13 @@
 import argparse
 import re
+import time
 
+import pyautogui
 import PIL.Image
 
 import hex_model
 import image_parse
+import screen
 import util
 
 af = '\x1b[38;5;{}m'.format
@@ -194,6 +197,32 @@ def read_board(im):
     return board
 
 
+def apply_commands(board, commands, topleft):
+    """
+    Run commands against the running game app.
+    """
+    buttons = {
+        hex_model.Color.blue: 'left',
+        hex_model.Color.black: 'right',
+    }
+
+    dx, dy = topleft
+    for coord, color in commands:
+        x, y = board[coord].image_section.bounding_box.center
+        # TODO - dpi???
+        pyautogui.click(x // 2 + dx, y // 2 + dy, button=buttons[color])
+
+    # Hexcells has a fun yellow confetti explosion when you click a cell.
+    # Unfortunately this fun confetti makes it into our screenshot, and
+    # tesseract loses its mind trying to read it. We wait for the confetti
+    # to clear before taking a screenshot.
+    time.sleep(3)
+    im, _ = screen.grab_game_screen()
+
+    for coord, _ in commands:
+        board[coord] = read_hex(im, board[coord].image_section)
+
+
 def run_debug(args):
     board = get_debug_board()
     display_board(board)
@@ -212,12 +241,30 @@ def run_screenshot(args):
     display_board(board)
 
 
+def run_screen(args):
+    time.sleep(3)
+    im, topleft = screen.grab_game_screen()
+    board = read_board(im)
+
+    display_board(board)
+    solutions = True
+    while solutions and not board.is_solved:
+        solutions = list(board.solve())
+        apply_commands(board, solutions, topleft)
+        print()
+        display_board(board)
+        print()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     subparsers = parser.add_subparsers()
 
     debug_parser = subparsers.add_parser('debug', help="")
     debug_parser.set_defaults(func=run_debug)
+
+    screen_parser = subparsers.add_parser('screen', help="")
+    screen_parser.set_defaults(func=run_screen)
 
     screenshot_parser = subparsers.add_parser('screenshot', help="")
     screenshot_parser.add_argument('file', type=str, help="path to the screenshot")

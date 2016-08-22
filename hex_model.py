@@ -99,7 +99,7 @@ class Hex:
         return fmt.format(self.value)
 
     def clone(self):
-        return Hex(self.text, self.color)
+        return Hex(self.text, self.color, self.image_section)
 
     def __repr__(self):
         return '{}({!r}, Color.{})'.format(type(self).__name__, self.text, self.color.name)
@@ -355,6 +355,14 @@ class HexBoard:
     def __setitem__(self, key, value):
         coord = coordinate_by_key(key)
         self._board[coord] = value
+        self._clicked.pop(coord, None)
+
+    @property
+    def is_solved(self):
+        return all(
+            self[coord].color != Color.yellow
+            for coord in self._board
+        )
 
     @property
     def rows(self):
