@@ -7,14 +7,14 @@ import Quartz as quartz
 
 def _get_active_window():
     workspace = appkit.NSWorkspace.sharedWorkspace()
-    activeApps = workspace.runningApplications()
-    for app in activeApps:
+    active_apps = workspace.runningApplications()
+    for app in active_apps:
         name = app.localizedName()
         if name and name.startswith('Hexcells'):  # TODO: this is a stopgap
         # if app.isActive():
             options = quartz.kCGWindowListOptionOnScreenOnly
-            windowList = quartz.CGWindowListCopyWindowInfo(options, quartz.kCGNullWindowID)
-            for window in windowList:
+            window_list = quartz.CGWindowListCopyWindowInfo(options, quartz.kCGNullWindowID)
+            for window in window_list:
                 if window['kCGWindowOwnerName'] == app.localizedName():
                     return window
 
@@ -47,4 +47,5 @@ def grab_game_screen():
 
 if __name__ == '__main__':
     time.sleep(2)
-    grab_game_screen().show()
+    im, _ = grab_game_screen()
+    im.show()

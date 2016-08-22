@@ -10,7 +10,7 @@ class Color(enum.Enum):
     black = (0x3e, 0x3e, 0x3e)
 
     @classmethod
-    def closest(self, value):
+    def closest(cls, value):
         """
         Return the enum element closest in color to the given color.
 
@@ -75,9 +75,9 @@ def parse_clue(text):
 
 def generate_hex_circle(distance):
     return (
-       (x, y, -x - y)
-       for x in range(-distance, distance + 1)
-       for y in range(max(-distance, -distance - x), min(distance, distance - x) + 1)
+        (x, y, -x - y)
+        for x in range(-distance, distance + 1)
+        for y in range(max(-distance, -distance - x), min(distance, distance - x) + 1)
     )
 
 
@@ -251,7 +251,7 @@ class ContiguousConstraint(AbstractContiguousConstraint):
         # 3: bbyyyy -> bbykky
         possible = set()
         for i, _ in enumerate(section):
-            section_range = {j % len(section) for j in range(i, i + value)}
+            section_range = {j % len(section) for j in range(i, i + self.value)}
             if all(blue in section_range for blue in blues):
                 possible |= section_range
         possible = {section[p] for p in possible}
