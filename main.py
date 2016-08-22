@@ -212,6 +212,13 @@ def apply_commands(board, commands, topleft):
         # TODO - dpi???
         pyautogui.click(x // 2 + dx, y // 2 + dy, button=buttons[color])
 
+    # If we just solved the board, the "game solved" overlay has showed up,
+    # and we should not attempt to parse the board again.
+    # TODO: that having been said, we might want to look for the overlay
+    #       to verify that we didn't mess up?
+    if board.is_solved:
+        return
+
     # Hexcells has a fun yellow confetti explosion when you click a cell.
     # Unfortunately this fun confetti makes it into our screenshot, and
     # tesseract loses its mind trying to read it. We wait for the confetti
