@@ -1,4 +1,5 @@
 import argparse
+import heapq
 import re
 import time
 
@@ -139,7 +140,10 @@ def display_board(board):
     Display the board of flat-top hexes.
     """
     leftmost = board.leftmost
+    last_row_num, _ = next(board.rows)
     for row_num, row in board.rows:
+        print(end='\n' * (row_num - last_row_num - 1))
+        last_row_num = row_num
         bump = (row_num % 2) != (leftmost % 2)
         last = leftmost
         if bump:
@@ -159,6 +163,62 @@ def display_board(board):
             print('{}{:^3}{}'.format(color, hex_.text, clear), end=' ')
             last = x
         print()
+
+
+def _draw_mid_row(row_queue, leftmost):
+    last = leftmost - 1
+    for (x, y, z), hex_ in heapq.merge(*row_queue, key=lambda x_y_z__hex: x_y_z__hex[0][0]):
+        color = hexagon_colors[hex_.color]
+        color = ab(color)
+        print(end='    ' * (x - last - 1))
+        print(end=' {}   {}'.format(color, clear))
+        last = x
+    print()
+
+
+def display_full_board(board):
+    import collections
+    leftmost = board.leftmost
+
+    row_queue = collections.deque([[], []], 2)
+    last_row_num, _ = next(board.rows)
+
+    for row_num, row in board.rows:
+        row_diff = (row_num - last_row_num - 1)
+        if row_diff > 0:
+            row_queue.append([])
+            _draw_mid_row(row_queue, leftmost)
+            print('\n\n' * ((row_diff - 1)))
+        last_row_num = row_num
+        row = list(row)
+
+        row_queue.append(row)
+        _draw_mid_row(row_queue, leftmost)
+
+        bump = (row_num % 2) != (leftmost % 2)
+        last = leftmost
+
+        if bump:
+            # leftmost is even, align even x's on left
+            # leftmost is odd, align odd x's on left
+            print(end='    ')
+        else:
+            # row_num is odd, leftmost is odd, diff one more than you are
+            # row_num is even, leftmost is even, diff one more than you are
+            last -= 1
+
+        for (x, y, z), hex_ in row:
+            color = hexagon_colors[hex_.color]
+            color = ab(color)
+            print(end='        ' * ((x - last + 1) // 2 - 1))
+            inner = '{:^3}'.format(hex_.text)
+            if x == y == z == 0:
+                inner = '{}{}{}'.format(ab(1), inner, color)
+            print('{} {} {}'.format(color, inner, clear), end='   ')
+            last = x
+        print()
+    row_queue.append([])
+    _draw_mid_row(row_queue, leftmost)
 
 
 def save_debug_board(board):
@@ -221,41 +281,42 @@ def apply_commands(board, commands, topleft):
         board[coord] = read_hex(im, im_data, label_array, board[coord].image_box)
 
 
-def run_debug(args):
+def run_debug(args, display_fn):
     board = get_debug_board()
-    display_board(board)
+    display_fn(board)
     print('\n')
     solutions = list(board.solve())
     board.apply_clicked()
-    display_board(board)
+    display_fn(board)
 
 
-def run_screenshot(args):
+def run_screenshot(args, display_fn):
     board = read_board(PIL.Image.open(args.file))
-    display_board(board)
+    display_fn(board)
     print('\n')
     solutions = list(board.solve())
     board.apply_clicked()
-    display_board(board)
+    display_fn(board)
 
 
-def run_screen(args):
+def run_screen(args, display_fn):
     time.sleep(3)
     im, topleft = screen.grab_game_screen()
     board = read_board(im)
 
-    display_board(board)
+    display_fn(board)
     solutions = True
     while solutions and not board.is_solved:
         solutions = list(board.solve())
         apply_commands(board, solutions, topleft)
         print()
-        display_board(board)
+        display_fn(board)
         print()
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
+    parser.add_argument('--display', default='small', choices=['none', 'small', 'large'])
     subparsers = parser.add_subparsers()
 
     debug_parser = subparsers.add_parser('debug', help="")
@@ -269,4 +330,9 @@ if __name__ == '__main__':
     screenshot_parser.set_defaults(func=run_screenshot)
 
     args = parser.parse_args()
-    args.func(args)
+    display_fn = {
+        'none': lambda board: None,
+        'small': display_board,
+        'large': display_full_board,
+    }[args.display]
+    args.func(args, display_fn)
