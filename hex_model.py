@@ -420,7 +420,7 @@ class HexBoard:
     def _get_simplified_region(self, hexes, value):
         filtered_hexes = set()
         for coord in hexes:
-            color = self._board[coord].color
+            color = self[coord].color
             if color == Color.yellow:
                 filtered_hexes.add(coord)
             elif color == Color.blue:
