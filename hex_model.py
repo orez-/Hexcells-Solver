@@ -357,6 +357,10 @@ class HexBoard:
         self._board[coord] = value
         self._clicked.pop(coord, None)
 
+    def __contains__(self, key):
+        coord = coordinate_by_key(key)
+        return coord in self._board
+
     @property
     def is_solved(self):
         return all(

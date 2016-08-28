@@ -2,6 +2,7 @@ import argparse
 import re
 import time
 
+import numpy
 import pyautogui
 import PIL.Image
 
@@ -55,14 +56,7 @@ def get_hex_text(im, box):
     """
     Read text from the hex contained in the given box.
     """
-    # we chop off the corners of the hex to avoid getting the OCR confused about
-    # the shape of the hex vs numbers.
-    fourth_width = box.width // 4
-    fourth_height = box.height // 4
-    hex_img = im.crop((
-        box.left + fourth_width, box.top + fourth_height,
-        box.right - fourth_width, box.bottom - fourth_height,
-    ))
+    hex_img = im.crop(box)
     try:
         return _interpret_text(image_parse.get_text_from_image(hex_img))
     except ValueError as e:
@@ -71,7 +65,7 @@ def get_hex_text(im, box):
         return input("\n{}: ".format(e))
 
 
-def is_hexagon(section, box):
+def is_hexagon(box):
     """
     Identify if the given contiguous set of coordinates is a hexagon.
     """
@@ -83,64 +77,60 @@ def is_hexagon(section, box):
         return False
 
     # Eliminate noise.
-    if len(section) < 1000:
+    if box.width * box.height < 5000:
         return False
 
     return True
 
 
-@util.timeit("Parsin' hexagons")
-def parse_hexagons(im, sections):
+@util.timeit("Parsin' labeled hexagons")
+def parse_labeled_hexagons(im, im_data, label_array, objs):
     origin = None
     board = hex_model.HexBoard()
-    for section in sections:
-        box = section.bounding_box
-        if not is_hexagon(section, box):
+    for box in objs:
+        if not is_hexagon(box):
             continue
         center = box.center
 
         if not origin:
             # Arbitrarily call this guy the origin
-            spacing = 1.2  # TODO: >:\
+            spacing = 1.135  # TODO: >:\
             unit = (center[0] - box.left) * spacing
             origin = center
             coord = (0, 0)
         else:
             coord = pixel_to_hex(center[0] - origin[0], center[1] - origin[1], unit)
 
-        board[coord] = read_hex(im, section)
+        assert coord not in board, coord
+        board[coord] = read_hex(im, im_data, label_array, box)
     return board
 
 
-def read_hex(im, section):
-    # Get pixels that are not white (white is numbers)
-    white_pixels, pixels = util.partition_if(
-        (im.getpixel((x, y)) for x, y in section),
-        lambda value: all(c > 200 for c in value)
-    )
-
-    # If speed is an issue here we can probably take many fewer pixels.
-    color = tuple(
-        sum(component) / len(section)
-        for component in zip(*pixels)
-    )
-    color = hex_model.Color.closest(color)
+def read_hex(im, im_data, label_array, box):
+    # Average the colors of all the pixels in the hex.
+    # TODO - figure out how to apply a mask
+    #        to only check pixels IN the hex.
+    flattened_img = im_data[box.slice].reshape(-1, im_data.shape[-1])
+    avg_color = tuple(numpy.mean(flattened_img, axis=0))
+    color = hex_model.Color.closest(avg_color)
     text = '-'
 
-    epsilon = 20  # TODO: ᖍ(ツ)ᖌ
-    if len(white_pixels) > epsilon:  # enough white pixels to check for a number
-        text = get_hex_text(im, section.bounding_box)
+    # Check for if there is text on the hex.
+    if not label_array[box.text_box.slice].all():
+        text = get_hex_text(im, box.text_box)
 
     return hex_model.Hex(
         text=text,
         color=color,
-        image_section=section,
+        image_section=box,
     )
 
 
 def pixel_to_hex(x, y, size):
     q = x * 2/3 / size
     r = (-x / 3 + (3 ** 0.5)/3 * y) / size
+    if round(q * 2) % 2 or round(r * 2) % 2:
+        print("Warning - hex estimation dangerously inaccurate: ", (q, r), (x, y))
     return round(q), round(r)
 
 
@@ -188,11 +178,8 @@ def get_debug_board():
 
 def read_board(im):
     im = im.convert('RGB')
-    selection = image_parse.fuzzy_select(im, 0, 0, threshold=70)
-    selection = image_parse.invert_selection(im, selection)
-    sections = image_parse.get_contiguous_sections(im, selection)
-
-    board = parse_hexagons(im, sections)
+    im_data, label_array, objs = image_parse.label(im)
+    board = parse_labeled_hexagons(im, im_data, label_array, objs)
     save_debug_board(board)
     return board
 
@@ -208,7 +195,7 @@ def apply_commands(board, commands, topleft):
 
     dx, dy = topleft
     for coord, color in commands:
-        x, y = board[coord].image_section.bounding_box.center
+        x, y = board[coord].image_section.center
         # TODO - dpi???
         pyautogui.click(x // 2 + dx, y // 2 + dy, button=buttons[color])
 
@@ -223,11 +210,15 @@ def apply_commands(board, commands, topleft):
     # Unfortunately this fun confetti makes it into our screenshot, and
     # tesseract loses its mind trying to read it. We wait for the confetti
     # to clear before taking a screenshot.
-    time.sleep(3)
+    time.sleep(2)
     im, _ = screen.grab_game_screen()
+    im = im.convert('RGB')
+    # TODO: we know which part of the screen we need to parse.
+    #       It's probably faster to just label that part.
+    im_data, label_array, objs = image_parse.label(im)
 
     for coord, _ in commands:
-        board[coord] = read_hex(im, board[coord].image_section)
+        board[coord] = read_hex(im, im_data, label_array, board[coord].image_section)
 
 
 def run_debug(args):
