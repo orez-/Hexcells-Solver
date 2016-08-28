@@ -122,7 +122,7 @@ def read_hex(im, im_data, label_array, box):
     return hex_model.Hex(
         text=text,
         color=color,
-        image_section=box,
+        image_box=box,
     )
 
 
@@ -195,7 +195,7 @@ def apply_commands(board, commands, topleft):
 
     dx, dy = topleft
     for coord, color in commands:
-        x, y = board[coord].image_section.center
+        x, y = board[coord].image_box.center
         # TODO - dpi???
         pyautogui.click(x // 2 + dx, y // 2 + dy, button=buttons[color])
 
@@ -218,7 +218,7 @@ def apply_commands(board, commands, topleft):
     im_data, label_array, objs = image_parse.label(im)
 
     for coord, _ in commands:
-        board[coord] = read_hex(im, im_data, label_array, board[coord].image_section)
+        board[coord] = read_hex(im, im_data, label_array, board[coord].image_box)
 
 
 def run_debug(args):
