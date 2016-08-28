@@ -7,7 +7,6 @@ Currently only works on OS X 10.10+
 #### TODOs
 - Parse row-constraints from an image of the board.
 - Solve non-contiguous constraints.
-- Improve performance of parsing board image, maybe with numpy (currently takes a full, agonizing minute).
 - Better unify existing constraint types to allow solving more subtle clues:
 ```
       -   -           -   -
