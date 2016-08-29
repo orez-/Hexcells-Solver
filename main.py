@@ -1,5 +1,4 @@
 import argparse
-import heapq
 import re
 import time
 
@@ -7,23 +6,13 @@ import numpy
 import pyautogui
 import PIL.Image
 
+import display
 import hex_model
 import image_parse
 import screen
 import util
 
-af = '\x1b[38;5;{}m'.format
-ab = '\x1b[48;5;{}m'.format
-clear = '\x1b[0m'
-
-
 HEXAGON_RATIO = (3 ** 0.5) / 2  # width * HEXAGON_RATIO = height
-
-hexagon_colors = {
-    hex_model.Color.blue: 38,
-    hex_model.Color.yellow: 214,
-    hex_model.Color.black: 237,
-}
 
 
 def _interpret_text(text):
@@ -135,92 +124,6 @@ def pixel_to_hex(x, y, size):
     return round(q), round(r)
 
 
-def display_board(board):
-    """
-    Display the board of flat-top hexes.
-    """
-    leftmost = board.leftmost
-    last_row_num, _ = next(board.rows)
-    for row_num, row in board.rows:
-        print(end='\n' * (row_num - last_row_num - 1))
-        last_row_num = row_num
-        bump = (row_num % 2) != (leftmost % 2)
-        last = leftmost
-        if bump:
-            # leftmost is even, align even x's on left
-            # leftmost is odd, align odd x's on left
-            print(end='  ')
-        else:
-            # row_num is odd, leftmost is odd, diff one more than you are
-            # row_num is even, leftmost is even, diff one more than you are
-            last -= 1
-        for (x, y, z), hex_ in row:
-            color = hexagon_colors[hex_.color]
-            color = af(color)
-            if x == y == z == 0:
-                color += ab(237)
-            print(end='    ' * ((x - last + 1) // 2 - 1))
-            print('{}{:^3}{}'.format(color, hex_.text, clear), end=' ')
-            last = x
-        print()
-
-
-def _draw_mid_row(row_queue, leftmost):
-    last = leftmost - 1
-    for (x, y, z), hex_ in heapq.merge(*row_queue, key=lambda x_y_z__hex: x_y_z__hex[0][0]):
-        color = hexagon_colors[hex_.color]
-        color = ab(color)
-        print(end='    ' * (x - last - 1))
-        print(end=' {}   {}'.format(color, clear))
-        last = x
-    print()
-
-
-def display_full_board(board):
-    import collections
-    leftmost = board.leftmost
-
-    row_queue = collections.deque([[], []], 2)
-    last_row_num, _ = next(board.rows)
-
-    for row_num, row in board.rows:
-        row_diff = (row_num - last_row_num - 1)
-        if row_diff > 0:
-            row_queue.append([])
-            _draw_mid_row(row_queue, leftmost)
-            print('\n\n' * ((row_diff - 1)))
-        last_row_num = row_num
-        row = list(row)
-
-        row_queue.append(row)
-        _draw_mid_row(row_queue, leftmost)
-
-        bump = (row_num % 2) != (leftmost % 2)
-        last = leftmost
-
-        if bump:
-            # leftmost is even, align even x's on left
-            # leftmost is odd, align odd x's on left
-            print(end='    ')
-        else:
-            # row_num is odd, leftmost is odd, diff one more than you are
-            # row_num is even, leftmost is even, diff one more than you are
-            last -= 1
-
-        for (x, y, z), hex_ in row:
-            color = hexagon_colors[hex_.color]
-            color = ab(color)
-            print(end='        ' * ((x - last + 1) // 2 - 1))
-            inner = '{:^3}'.format(hex_.text)
-            if x == y == z == 0:
-                inner = '{}{}{}'.format(ab(1), inner, color)
-            print('{} {} {}'.format(color, inner, clear), end='   ')
-            last = x
-        print()
-    row_queue.append([])
-    _draw_mid_row(row_queue, leftmost)
-
-
 def save_debug_board(board):
     try:
         with open('debug_board.txt', 'w') as f:
@@ -283,20 +186,20 @@ def apply_commands(board, commands, topleft):
 
 def run_debug(args, display_fn):
     board = get_debug_board()
-    display_fn(board)
+    print(display_fn(board))
     print('\n')
     solutions = list(board.solve())
     board.apply_clicked()
-    display_fn(board)
+    print(display_fn(board))
 
 
 def run_screenshot(args, display_fn):
     board = read_board(PIL.Image.open(args.file))
-    display_fn(board)
+    print(display_fn(board))
     print('\n')
     solutions = list(board.solve())
     board.apply_clicked()
-    display_fn(board)
+    print(display_fn(board))
 
 
 def run_screen(args, display_fn):
@@ -304,13 +207,13 @@ def run_screen(args, display_fn):
     im, topleft = screen.grab_game_screen()
     board = read_board(im)
 
-    display_fn(board)
+    print(display_fn(board))
     solutions = True
     while solutions and not board.is_solved:
         solutions = list(board.solve())
         apply_commands(board, solutions, topleft)
         print()
-        display_fn(board)
+        print(display_fn(board))
         print()
 
 
@@ -331,8 +234,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     display_fn = {
-        'none': lambda board: None,
-        'small': display_board,
-        'large': display_full_board,
+        'none': lambda board: '',
+        'small': display.display_board,
+        'large': display.display_full_board,
     }[args.display]
     args.func(args, display_fn)

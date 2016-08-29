@@ -240,7 +240,7 @@ class ContiguousConstraint(AbstractContiguousConstraint):
             self._contiguous_hexes,
             lambda section: len(section) < self.value
         )
-        yield from to_remove
+        yield from self._set_sections(to_remove, Color.black)
 
     def _solve_cyclic_section(self, board):
         section, = self._contiguous_hexes
