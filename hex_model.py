@@ -1,3 +1,4 @@
+import contextlib
 import enum
 import itertools
 
@@ -329,7 +330,68 @@ class ContiguousConstraint(AbstractContiguousConstraint):
 
 class NonContiguousConstraint(AbstractContiguousConstraint):
     def solve(self, board):
-        pass
+        self._refresh_sections(board)
+        blue_sections = (
+            (i, section) for i, section in enumerate(self._contiguous_hexes)
+            if any(board[coord].color == Color.blue for coord in section)
+        )
+        blue_section_id = None
+        current_blues = 0
+        with contextlib.suppress(StopIteration):
+            blue_section_id, blue_section = next(blue_sections)
+            current_blues = sum(board[coord].color == Color.blue for coord in blue_section)
+            next(blue_sections)
+            # If we have two blue sections we've already necessarily got
+            # a non-contiguous setup - there's nothing else we can learn
+            # from this.
+            return
+
+        # Check all options for the remaining spots, looking for spots
+        # where there is only one option.
+        remaining_blues = self.value - current_blues
+        available_coords = [
+            (i, coord) for i, section in enumerate(self._contiguous_hexes)
+            for coord in section if board[coord].color != Color.blue
+        ]
+        spot_options = {
+            coord: set() for section in self._contiguous_hexes
+            for coord in section if board[coord].color != Color.blue
+        }
+        for id_coords in itertools.combinations(available_coords, remaining_blues):
+            section_ids, coords = zip(*id_coords)
+            section_ids = set(section_ids)
+            if blue_section_id is not None:
+                section_ids.add(blue_section_id)
+
+            # If we're only in one section we're in danger of being contiguous
+            if len(section_ids) == 1:
+                section_id, = section_ids
+
+                blue_groups = (
+                    blue for blue, _ in itertools.groupby(
+                        self._contiguous_hexes[section_id],
+                        key=lambda coord: board[coord].color == Color.blue or coord in coords
+                    )
+                    if blue
+                )
+                # Skip contiguous configurations
+                try:
+                    next(blue_groups)
+                    next(blue_groups)
+                except StopIteration:
+                    continue
+
+            # This is a valid configuration - mark down which are blue
+            # and which are black.
+            for coord, options in spot_options.items():
+                options.add(Color.blue if coord in coords else Color.black)
+
+        for coord, options in spot_options.items():
+            # If there's no options this is either an unsolvable board or we messed up.
+            assert options, coord
+            if len(options) == 1:
+                color, = options
+                yield coord, color
 
 
 class HexBoard:
@@ -439,7 +501,7 @@ class HexBoard:
         for coord, hex_ in self._board.items():
             if hex_.value is None:
                 continue
-            if hex_.is_contiguous:
+            if hex_.is_contiguous is not None:
                 self._contiguous_constraints.add(AbstractContiguousConstraint.ring(self, coord))
             distance = 1 if hex_.color == Color.black else 2
             hexes, value = self._get_simplified_region(self._neighbors(coord, distance), hex_.value)

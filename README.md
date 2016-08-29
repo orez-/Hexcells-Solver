@@ -6,7 +6,6 @@ Currently only works on OS X 10.10+
 
 #### TODOs
 - Parse row-constraints from an image of the board.
-- Solve non-contiguous constraints.
 - Better unify existing constraint types to allow solving more subtle clues:
 ```
       -   -           -   -
