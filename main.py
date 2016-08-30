@@ -10,6 +10,7 @@ import display
 import hex_model
 import image_parse
 import screen
+import tests
 import util
 
 HEXAGON_RATIO = (3 ** 0.5) / 2  # width * HEXAGON_RATIO = height
@@ -217,6 +218,10 @@ def run_screen(args, display_fn):
         print()
 
 
+def run_tests(args, display_fn):
+    tests.run_tests(display_fn)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--display', default='small', choices=['none', 'small', 'large'])
@@ -231,6 +236,9 @@ if __name__ == '__main__':
     screenshot_parser = subparsers.add_parser('screenshot', help="")
     screenshot_parser.add_argument('file', type=str, help="path to the screenshot")
     screenshot_parser.set_defaults(func=run_screenshot)
+
+    tests_parser = subparsers.add_parser('tests')
+    tests_parser.set_defaults(func=run_tests)
 
     args = parser.parse_args()
     display_fn = {

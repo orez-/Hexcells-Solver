@@ -64,6 +64,10 @@ def _split_on_arrow(board_strings):
 
 
 class SolverUnitTest(unittest.TestCase):
+    @classmethod
+    def set_display_fn(cls, fn):
+        cls.display_fn = staticmethod(fn)
+
     def assertColor(self, coord, expected_color):
         color = self.solved_board[coord].color
 
@@ -72,7 +76,7 @@ class SolverUnitTest(unittest.TestCase):
             coord,
             expected_color,
             self.original,
-            display.display_full_board(self.solved_board),
+            self.display_fn(self.solved_board),
         )
 
     def assertSolve(self, start_string, expected_string=None):
@@ -83,8 +87,8 @@ class SolverUnitTest(unittest.TestCase):
 
         assert set(board._board) == set(expected._board), (
             "Board shapes must match.\n{}\n\n{}".format(
-                display.display_full_board(board),
-                display.display_full_board(expected),
+                self.display_fn(board),
+                self.display_fn(expected),
             )
         )
 
@@ -94,8 +98,8 @@ class SolverUnitTest(unittest.TestCase):
         for coord, hex_ in expected._board.items():
             assert board[coord].color == hex_.color, (
                 "Solved board does not match expected.\nExpected:\n{}\n\nActual:\n{}".format(
-                    display.display_full_board(expected),
-                    display.display_full_board(board),
+                    self.display_fn(expected),
+                    self.display_fn(board),
                 )
             )
 
@@ -145,5 +149,13 @@ class SolverUnitTest(unittest.TestCase):
         """)
 
 
+def run_tests(display_fn):
+    loader = unittest.TestLoader()
+    SolverUnitTest.set_display_fn(display_fn)
+    suite = loader.loadTestsFromTestCase(SolverUnitTest)
+    unittest.TextTestRunner(verbosity=2).run(suite)
+
+
 if __name__ == '__main__':
+    SolverUnitTest.set_display_fn(display.display_full_board)
     unittest.main()
