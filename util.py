@@ -1,4 +1,5 @@
 import functools
+import signal
 import sys
 import time
 
@@ -75,3 +76,22 @@ class cached_property(object):
             return self
         value = instance.__dict__[self._fget.__name__] = self._fget(instance)
         return value
+
+
+class Timeout(object):
+    """
+    http://stackoverflow.com/questions/2281850/timeout-function-if-it-takes-too-long-to-finish/22348885#22348885
+    """
+    def __init__(self, seconds=1, error_message='Timeout'):
+        self.seconds = seconds
+        self.error_message = error_message
+
+    def handle_timeout(self, signum, frame):
+        raise TimeoutError(self.error_message)
+
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.handle_timeout)
+        signal.alarm(self.seconds)
+
+    def __exit__(self, type_, value, traceback):
+        signal.alarm(0)

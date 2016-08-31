@@ -545,6 +545,7 @@ class HexBoard:
                     new_regions[hexes1_exclusive] = value1 - omax
                 if hexes2_exclusive not in self._regions:
                     new_regions[hexes2_exclusive] = value2 - omax
+        new_regions.pop(frozenset(), 0)
         return new_regions
 
     def _click(self, coord, color):

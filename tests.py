@@ -3,6 +3,7 @@ import unittest
 
 import display
 from hex_model import Color, Hex, HexBoard
+import util
 
 
 def _get_bump(line):
@@ -169,24 +170,24 @@ class SolverUnitTest(unittest.TestCase):
     def assertSolve(self, start_string, expected_string=None):
         if expected_string is None:
             start_string, expected_string = _split_on_arrow(start_string)
-        board = _board_from_string(start_string)
-        expected = _board_from_string(expected_string)
+        self.board = _board_from_string(start_string)
+        self.expected = _board_from_string(expected_string)
 
-        assert set(board._board) == set(expected._board), (
+        assert set(self.board._board) == set(self.expected._board), (
             "Board shapes must match.\n{}\n\n{}".format(
-                self.display_fn(board),
-                self.display_fn(expected),
+                self.display_fn(self.board),
+                self.display_fn(self.expected),
             )
         )
 
-        list(board.solve())
-        board.apply_clicked()
+        list(self.board.solve())
+        self.board.apply_clicked()
 
-        for coord, hex_ in expected._board.items():
-            assert board[coord].color == hex_.color, (
+        for coord, hex_ in self.expected._board.items():
+            assert self.board[coord].color == hex_.color, (
                 "Solved board does not match expected.\nExpected:\n{}\n\nActual:\n{}".format(
-                    self.display_fn(expected),
-                    self.display_fn(board),
+                    self.display_fn(self.expected),
+                    self.display_fn(self.board),
                 )
             )
 
@@ -253,6 +254,18 @@ class SolverUnitTest(unittest.TestCase):
          x   o      x   o
            -          x
         """)
+
+    def test_infinite_loop(self):
+        try:
+            with util.Timeout(seconds=2):
+                self.assertSolve("""
+                    -   -         -   -
+                  1   2     =>  1   2
+                    -   -         -   -
+                """)
+        except TimeoutError:
+            assert False, 'Timeout!\n{}'.format(self.display_fn(self.board))
+
 
 def run_tests(display_fn):
     loader = unittest.TestLoader()
