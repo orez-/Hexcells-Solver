@@ -395,11 +395,12 @@ class NonContiguousConstraint(AbstractContiguousConstraint):
 
 
 class HexBoard:
-    def __init__(self):
+    def __init__(self, remaining=None):
         self._board = {}
         self._clicked = {}
         self._regions = None
         self._contiguous_constraints = None
+        self.remaining = remaining
 
     def get(self, key, default=None):
         try:
@@ -498,6 +499,11 @@ class HexBoard:
         """
         self._regions = {}
         self._contiguous_constraints = set()
+        if self.remaining is not None:
+            self._regions[frozenset(
+                coord for coord, hex_ in self._board.items()
+                if hex_.color == Color.yellow
+            )] = self.remaining
         for coord, hex_ in self._board.items():
             if hex_.value is None:
                 continue
@@ -551,6 +557,9 @@ class HexBoard:
     def _click(self, coord, color):
         hex_ = self[coord].clone()
         assert hex_.color == Color.yellow, (coord, hex_, color)
+        # We decrement `remaining` purely for display purposes
+        if color == Color.blue and self.remaining is not None:
+            self.remaining -= 1
         hex_.color = color
         self._clicked[coord] = hex_
 

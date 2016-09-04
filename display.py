@@ -23,6 +23,8 @@ def display_board(board):
     print_ = string_builder.append
     leftmost = board.leftmost
     last_row_num, _ = next(board.rows)
+    if board.remaining is not None:
+        print_("Remaining: {}\n".format(board.remaining))
     for row_num, row in board.rows:
         print_('\n' * (row_num - last_row_num - 1))
         last_row_num = row_num
@@ -66,6 +68,9 @@ def display_full_board(board):
     string_builder = collections.deque()
     print_ = string_builder.append
     leftmost = board.leftmost
+
+    if board.remaining is not None:
+        print_("Remaining: {}\n".format(board.remaining))
 
     row_queue = collections.deque([[], []], 2)
     last_row_num, _ = next(board.rows)

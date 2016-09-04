@@ -35,7 +35,7 @@ def _get_hex(text):
     return Hex(text, color)
 
 
-def _board_from_string(string):
+def _board_from_string(string, **kwargs):
     lines = string.split('\n')
     leading_spaces = min(len(re.match(r'^ *', line).group(0)) for line in lines if line.strip())
     lines = [line[leading_spaces:] for line in lines]
@@ -53,7 +53,7 @@ def _board_from_string(string):
             hex_line.append(_get_hex(text))
         hex_lines.append(hex_line)
 
-    board = HexBoard()
+    board = HexBoard(**kwargs)
     for y, line in enumerate(hex_lines):
         for x, elem in enumerate(line):
             if elem:
@@ -167,10 +167,10 @@ class SolverUnitTest(unittest.TestCase):
             self.display_fn(self.solved_board),
         )
 
-    def assertSolve(self, start_string, expected_string=None):
+    def assertSolve(self, start_string, expected_string=None, **kwargs):
         if expected_string is None:
             start_string, expected_string = _split_on_arrow(start_string)
-        self.board = _board_from_string(start_string)
+        self.board = _board_from_string(start_string, **kwargs)
         self.expected = _board_from_string(expected_string)
 
         assert set(self.board._board) == set(self.expected._board), (
@@ -265,6 +265,24 @@ class SolverUnitTest(unittest.TestCase):
                 """)
         except TimeoutError:
             assert False, 'Timeout!\n{}'.format(self.display_fn(self.board))
+
+    def test_known_remaining(self):
+        self.assertSolve("""
+          -   -           x   x
+        -   -   -       x   o   x
+          2   2     =>    2   2
+        -   -   -       x   o   x
+          -   -           x   x
+        """, remaining=2)
+
+    def test_no_remaining(self):
+        self.assertSolve("""
+          -   -           x   x
+        -   -   -       x   x   x
+          -   -     =>    x   x
+        -   -   -       x   x   x
+          -   -           x   x
+        """, remaining=0)
 
 
 def run_tests(display_fn):

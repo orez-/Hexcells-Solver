@@ -1,4 +1,5 @@
 import argparse
+import math
 import re
 import time
 
@@ -43,9 +44,9 @@ def _interpret_text(text):
     raise ValueError("Could not parse {!r}".format(text))
 
 
-def get_hex_text(im, box):
+def get_image_text(im, box):
     """
-    Read text from the hex contained in the given box.
+    Read text from the given subsection of the image.
     """
     hex_img = im.crop(box)
     try:
@@ -74,26 +75,49 @@ def is_hexagon(box):
     return True
 
 
-@util.timeit("Parsin' labeled hexagons")
+def is_remaining_box(box, im_size):
+    width, height = im_size
+    from_right = width - box.right
+
+    # Assert position
+    if not math.isclose(from_right / box.top, 2 / 3, rel_tol=0.10):
+        return False
+
+    # Assert shape
+    if not math.isclose(box.width / box.height, 282 / 106, rel_tol=0.01):
+        return False
+
+    return True
+
+
+@util.timeit("Parsin' labeled hexagons\n")
 def parse_labeled_hexagons(im, im_data, label_array, objs):
     origin = None
     board = hex_model.HexBoard()
     for box in objs:
-        if not is_hexagon(box):
-            continue
-        center = box.center
+        if is_remaining_box(box, im.size):
+            read_box = image_parse.Box(
+                left=box.left,
+                top=box.top + box.height // 3,
+                right=box.right,
+                bottom=box.bottom,
+            )
+            board.remaining = int(get_image_text(im, read_box))
+            print(board.remaining)
+        elif is_hexagon(box):
+            center = box.center
 
-        if not origin:
-            # Arbitrarily call this guy the origin
-            spacing = 1.135  # TODO: >:\
-            unit = (center[0] - box.left) * spacing
-            origin = center
-            coord = (0, 0)
-        else:
-            coord = pixel_to_hex(center[0] - origin[0], center[1] - origin[1], unit)
+            if not origin:
+                # Arbitrarily call this guy the origin
+                spacing = 1.135  # TODO: >:\
+                unit = (center[0] - box.left) * spacing
+                origin = center
+                coord = (0, 0)
+            else:
+                coord = pixel_to_hex(center[0] - origin[0], center[1] - origin[1], unit)
 
-        assert coord not in board, coord
-        board[coord] = read_hex(im, im_data, label_array, box)
+            assert coord not in board, coord
+            board[coord] = read_hex(im, im_data, label_array, box)
     return board
 
 
@@ -108,7 +132,7 @@ def read_hex(im, im_data, label_array, box):
 
     # Check for if there is text on the hex.
     if not label_array[box.text_box.slice].all():
-        text = get_hex_text(im, box.text_box)
+        text = get_image_text(im, box.text_box)
 
     return hex_model.Hex(
         text=text,
@@ -225,7 +249,8 @@ def run_tests(args, display_fn):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--display', default='small', choices=['none', 'small', 'large'])
-    subparsers = parser.add_subparsers()
+    subparsers = parser.add_subparsers(dest='cmd')
+    subparsers.required = True
 
     debug_parser = subparsers.add_parser('debug', help="")
     debug_parser.set_defaults(func=run_debug)
